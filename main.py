@@ -8,6 +8,7 @@ class PlayerWindow(QWidget):
     sender = Signal(str)
     def __init__(self):
         super().__init__()
+        self.file = None
         self.server = MCAST()
         self.setupUi()
 
@@ -21,13 +22,57 @@ class PlayerWindow(QWidget):
         self.setGeometry(100,100,800,450)
         self.show()
         self.server.start()
+        self.load_player()
         # self.showFullScreen()
+        
+    def load_player(self):
+        self.instance = vlc.Instance()
+        self.player = self.instance.media_player_new()
+        if sys.platform.startswith('linux'):
+            self.player.set_xwidnow(self.winId())
+        elif sys.platform.startswith('win32'):
+            self.player.set_hwnd(self.winId())
+        elif sys.platform.startswith('darwin'):
+            self.player.set_nsobject(int(self.winId()))
+            
+    def load_file(self, file):
+        if os.path.isfile(file):
+            self.file = file
+            media = self.instance.media_new(file)
+            self.player.set_media(media)
+            self.event_manager = self.player.event_manager()
+            self.event_manager.event_attach(vlc.EventType.MediaPlayerEndReached, self.finished)
+            self.event_manager.event_attach(vlc.EventType.MediaPlayerLengthChanged, self.get_media_length)
+            self.event_manager.event_attach(vlc.EventType.MediaPlayerTimeChanged, self.play_time_change)
+            self.sender.emit(json.dumps({"type":"info","message":'the file loaded successfully{}'.format(file)}))
+        else:
+            self.sender.emit(json.dumps({"type":"error","message":"the file does not exist"}))
+            
+    def play(self):
+        if self.file != None:
+            self.player.play()
+            self.sender.emit(json.dumps({"type":"play","media":self.file}))
+        else:
+            self.sender.emit(json.dumps({"type":"error","message":"dose not load file"}))
+            
+    def finished(self, _event):
+        self.sender.emit(json.dumps({"type":"end"}))
+        
+    def get_media_length(self, event):
+        self.sender.emit(json.dumps({"type":"mediaLength","length":self.player.get_length()}))
+    
+    def play_time_change(self, event):
+        # print(self.player.u.new_time)
+        self.sender.emit(json.dumps({"type":"playTime","current":self.player.get_time(),"position":self.player.get_position()}))
+        
 
     @Slot(str)
     def recv_comm(self, data):
         print(data)
         self.sender.emit(data)
         self.data = json.loads(data)
+        self.load_file('5.mp4')
+        self.player.play()
         
         
     def setFullScreen(self):
