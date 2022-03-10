@@ -1,11 +1,12 @@
-import vlc
 import sys, os, socket, struct, json, logging, copy
-from PySide2.QtWidgets import QApplication, QWidget, QLabel
-from PySide2.QtCore import Slot, Signal, QThread
-from PySide2.QtGui import QIcon
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel
+from PyQt5.QtCore import pyqtSlot, pyqtSignal, QThread
+from PyQt5.QtGui import QIcon
+from setuptools import Command
+import vlc
 
 class PlayerWindow(QWidget):
-    sender = Signal(str)
+    sender = pyqtSignal(str)
     def __init__(self):
         super().__init__()
         self.player = None
@@ -39,7 +40,7 @@ class PlayerWindow(QWidget):
         
     def set_window(self):
         if sys.platform.startswith('linux'):
-            self.player.set_xwidnow(self.winId())
+            self.player.set_xwindow(self.winId())
             logging.info('player window loaded on linux')
             self.rt({
                 "command":"load_player",
@@ -131,25 +132,61 @@ class PlayerWindow(QWidget):
                 "command":"stop"
             })
             pass
-        
-    def set_position(self, value):
+
+    def set_volume(self, value):
         try:
-            self.player.set_position(value)
-            self.rt({
-                "command":"setposition",
-                "value": value
-            })
+            if value >= 0 and value <= 100:
+                self.player.audio_set_volume(value)
+                logging.info("set voluem {}".format(value))
+                self.rt({
+                    "command":"setvolume",
+                    "volume":value,
+                })
+            else:
+                self.rt({
+                    "type":"error",
+                    "command":"setvolume",
+                    "result":False,
+                    "message":"volume value is out of range"
+                })
         except:
             self.rt({
                 "type":"error",
-                "command":"setopsition",
+                "command":"setvolume",
+                "result":False,
+                "message":"volume change error"
+            })
+                
+        
+    def set_position(self, value):
+        try:
+            if value >= 0 and value <= 1:
+                self.player.set_position(value)
+                logging.info("set position {}".format(value))
+                self.rt({
+                    "command":"setposition",
+                    "position": value
+                })
+            else:
+                logging.error("set position value is out of range")
+                self.rt({
+                    "type":"error",
+                    "command":"setposition",
+                    "result":False,
+                    "message":"value is out of range"
+                })
+        except:
+            logging.error("set position error")
+            self.rt({
+                "type":"error",
+                "command":"setposition",
                 "result":False
             })
             pass
         
     def setFullScreen(self, value):
         try:
-            self.player.set_fullscreen(value)
+            # self.player.set_fullscreen(value)
             if value == True:
                 self.showFullScreen()
             else:
@@ -213,7 +250,7 @@ class PlayerWindow(QWidget):
         
      
         
-    @Slot(str)
+    @pyqtSlot(str)
     def recv_comm(self, data):
         self.data = json.loads(data)
         if self.data["command"] == "play":
@@ -230,6 +267,8 @@ class PlayerWindow(QWidget):
             self.getStatus()
         elif self.data["command"] == "setposition":
             self.set_position(self.data["value"])
+        elif self.data["command"] == "setvolume":
+            self.set_volume(self.data["value"])
         else:
             self.rt({
                 "type":"error",
@@ -239,7 +278,7 @@ class PlayerWindow(QWidget):
             })
         
 class MCAST(QThread):
-    command = Signal(str)
+    command = pyqtSignal(str)
     def __init__(self, parent=None):
         super(MCAST, self).__init__(parent)
         self.addr = "224.12.123.234"
@@ -261,7 +300,7 @@ class MCAST(QThread):
                 print(e)
                 pass
             
-    @Slot(str)
+    @pyqtSlot(str)
     def sender(self, data):
         self.sock.sendto(data.encode('utf-8'), (self.addr, 12300))
 
