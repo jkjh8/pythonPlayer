@@ -121,6 +121,8 @@ class PlayerWindow(QWidget):
         try:
             self.player.stop()
             self.setWindowTitle("Video Player")
+            # clear screen
+            self.setStyleSheet("color:black;")
             self.rt({
                 "command":"stop",
                 "message":"player stopped successfully"
@@ -252,30 +254,34 @@ class PlayerWindow(QWidget):
         
     @pyqtSlot(str)
     def recv_comm(self, data):
-        self.data = json.loads(data)
-        if self.data["command"] == "play":
-            if "file" in self.data:
+        try:
+            self.data = json.loads(data)
+            if self.data["command"] == "play":
+                if "file" in self.data:
+                    self.load_file(self.data["file"])
+                self.play()
+            elif self.data["command"] == "stop":
+                self.stop()
+            elif self.data["command"] == "load":
                 self.load_file(self.data["file"])
-            self.play()
-        elif self.data["command"] == "stop":
-            self.player.stop()
-        elif self.data["command"] == "load":
-            self.load_file(self.data["file"])
-        elif self.data["command"] == "fullscreen":
-            self.setFullScreen(self.data['value'])
-        elif self.data["command"] == "status":
-            self.getStatus()
-        elif self.data["command"] == "setposition":
-            self.set_position(self.data["value"])
-        elif self.data["command"] == "setvolume":
-            self.set_volume(self.data["value"])
-        else:
-            self.rt({
-                "type":"error",
-                "result":False,
-                "command":"net",
-                "message":"unknown command"
-            })
+            elif self.data["command"] == "fullscreen":
+                self.setFullScreen(self.data['value'])
+            elif self.data["command"] == "status":
+                self.getStatus()
+            elif self.data["command"] == "setposition":
+                self.set_position(self.data["value"])
+            elif self.data["command"] == "setvolume":
+                self.set_volume(self.data["value"])
+            else:
+                self.rt({
+                    "type":"error",
+                    "result":False,
+                    "command":"net",
+                    "message":"unknown command"
+                })
+        except Exception as e:
+            print(e)
+            pass
         
 class MCAST(QThread):
     command = pyqtSignal(str)
